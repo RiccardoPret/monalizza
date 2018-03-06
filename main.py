@@ -1,13 +1,17 @@
 import ast
+import glob
 import os
 import time
 from collections import defaultdict
 
 import pathlib
+import numpy
+import multiprocessing as mp
 
 from compute_jaccard import compute_jaccard
 from detection import detection_mlw
-from fuzzy_hashes import initialize_database, generate_fuzzy_hashes
+from fuzzy_hashes import initialize_database, generate_fuzzy_hashes, parallel_initialize_database, \
+    parallel_generate_fuzzy_hashes, get_files
 from stats import mlw_stats
 
 
@@ -65,10 +69,48 @@ def init_db():
     initialize_database(database, ".")
     print("Database fuzzy generation: " + str(time.time() - start))
 
-if __name__ == '__main__':
-    data_folder = "malgenome"
-    database = "/home/pret/Uni/Tesi/Datasets/Others/Malgenome"
-    testset = "/home/pret/Uni/Tesi/Datasets/Others/MalgenomeObf"
 
-    # init_db()
-    run_detection(data_folder, testset)
+def parallel_detection(db_hashes, apks_list):
+    process_folder = data_folder+"/"+str(mp.current_process().pid)
+    pathlib.Path(process_folder).mkdir(parents=True, exist_ok=True)
+    test_hashes = parallel_generate_fuzzy_hashes(apks_list, process_folder)
+    detections = compute_jaccard(db_hashes, test_hashes, process_folder + "/jaccard_scores.txt")
+    detection_mlw(detections, process_folder)
+
+
+def unify_classifications():
+    lines = list()
+
+    for f in glob.glob(data_folder+"/**/*", recursive=True):
+        if f.endswith("classifications.txt"):
+            lines.extend(open(f, "r").read().splitlines())
+    with open("classifications.txt", "w") as cl:
+        for l in lines:
+            cl.write(l+"\n")
+
+
+def first_run(testset, n_proc):
+    db_hashes = read_hashes_file("hashes_database.txt")
+    apks = get_files(testset)
+    processes = [mp.Process(target=parallel_detection, args=(db_hashes, apk_list)) for apk_list in
+                 numpy.array_split(apks, n_proc)]
+
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
+    unify_classifications()
+    mlw_stats("classifications.txt")
+
+if __name__ == '__main__':
+    data_folder = "results"
+    n_proc = 2  # parallelism
+    database = "data"  # database path
+    testset = "test"  # test set path
+
+    pathlib.Path(data_folder).mkdir(parents=True, exist_ok=True)
+    start = time.time()
+    parallel_initialize_database(database, data_folder, n_proc)
+    print(str(time.time() - start))
+    first_run(testset, n_proc)
+    print(str(time.time() - start))

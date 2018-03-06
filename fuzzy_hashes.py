@@ -6,6 +6,9 @@ from collections import defaultdict
 
 import pathlib
 import ssdeep
+import multiprocessing as mp
+import numpy
+import shutil
 
 SLOPE = 0.05
 MIN_LEN_FUZZY = 7
@@ -64,51 +67,6 @@ def get_sub_fuzzies(fuzzy_hash):
     return sub_fuzzies
 
 
-def full_ssdeep(dataset_path, fuzzy_hash_file):
-    """
-    Get the normal ssdeep hash removing only resources from drawable folder
-    :return:
-    """
-    ssdeed_hashes = defaultdict(list)
-    apks = get_files(dataset_path)
-    with open(fuzzy_hash_file, "w") as fuzzy_hashes_file:
-        for apk in apks:
-            try:
-                with zipfile.ZipFile(apk, 'r') as zf:
-                    archive_elements = [(data.filename, data.file_size) for data in zf.filelist]
-                    for resource, res_size in archive_elements:
-                        if not resource.startswith("res/drawable"):
-                            bfile = zf.read(resource)
-                            fz_h = ssdeep.hash(bfile)
-                            if len(fz_h) > 1:  # Get rid off only single characters
-                                ssdeed_hashes[apk].append(fz_h)
-                fuzzy_hashes_file.write(str((apk, ssdeed_hashes[apk])) + "\n")
-            except Exception as e:
-                print(apk)
-                print(e)
-
-
-def split_from_full_ssdeep(file_path):
-    """
-    :param file_path:
-    :return:
-    """
-    ssdeep_hashes = defaultdict(list)
-
-    with open(file_path, "r") as fp:
-        lines = fp.read().splitlines()
-
-    with open("splitted.txt", "w") as cf:
-        for l in lines:
-            tup = ast.literal_eval(l)
-            apk = tup[0]
-            for fz_h in tup[1]:
-                if len(fz_h) >= MIN_LEN_FUZZY:
-                    sub_fuzzies = get_sub_fuzzies(fz_h)
-                    ssdeep_hashes[apk].extend(sub_fuzzies)
-            cf.write(str((apk, ssdeep_hashes[apk])) + "\n")
-
-
 def generate_apk_fuzzy_list(apk):
     apk_fuzzy_list = list()
     resources_dict = defaultdict(list)  # resource: [sub_fuzzies]
@@ -131,7 +89,7 @@ def generate_apk_fuzzy_list(apk):
 
 
 def print_hashes_file(hashes_file_name, ssdeep_hashes):
-    with open(hashes_file_name, "w") as fuzzy_hashes_file:
+    with open(hashes_file_name, "a") as fuzzy_hashes_file:
         for apk, sub_fuzzy_list in ssdeep_hashes.items():
             fuzzy_hashes_file.write("('"+apk+"', "+str(sub_fuzzy_list)+")\n")
 
@@ -188,8 +146,75 @@ def initialize_database(data_folder, logs_folder):
 
     # Store data (no print for res_hashes because they are not supposed to be available)
     pathlib.Path(logs_folder).mkdir(parents=True, exist_ok=True)
-    print_hashes_file(logs_folder+"/hashes_database.txt", ssdeep_hashes)
+    print_hashes_file(mp.current_process().pid+"/hashes_database.txt", ssdeep_hashes)
     with open(logs_folder+"/families_frequency.txt", "w") as db_f:
         db_f.write(str(fams_freq))
+
+    return ssdeep_hashes
+
+
+def single_proc_compute_fuzzy(apk_list, output):
+    hashes = defaultdict(list)  # apk: [fuzzy]
+    fams_freq = dict()  # fam: |variants|
+
+    for apk in apk_list:
+        hashes[apk], nul = generate_apk_fuzzy_list(apk)
+        try:
+            fams_freq[get_family(apk)] += 1
+        except KeyError:
+            fams_freq[get_family(apk)] = 1
+    pathlib.Path("hashes" + str(mp.current_process().pid)).mkdir(parents=True, exist_ok=True)
+    print_hashes_file("hashes" + str(mp.current_process().pid) + "/hashes_database.txt", hashes)
+    output.put(fams_freq)
+
+
+def parallel_initialize_database(data_folder, logs_folder, n_proc):
+    apks = get_files(data_folder)
+    output = mp.Queue()
+    fams_freq = dict()
+    processes = [mp.Process(target=single_proc_compute_fuzzy, args=(apk_list, output)) for apk_list in numpy.array_split(apks, n_proc)]
+
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
+    unify_db_hashes()
+    results = [output.get() for p in processes]
+    pathlib.Path(logs_folder).mkdir(parents=True, exist_ok=True)
+
+    for fam_freq in results:
+        for fam, freq in fam_freq.items():
+            try:
+                fams_freq[fam] += freq
+            except KeyError:
+                fams_freq[fam] = freq
+    with open("families_frequency.txt", "w") as db_f:
+        db_f.write(str(fams_freq))
+
+
+def unify_db_hashes():
+    lines = list()
+    for f in glob.glob("./**/*", recursive=True):
+        if f.endswith("hashes_database.txt") and "hashes" in f.split("/")[-2]:
+            lines.extend(open(f, "r").read().splitlines())
+    with open("hashes_database.txt", "w") as cl:
+        for l in lines:
+            cl.write(l+"\n")
+    # Delete temp folders
+    for f in glob.glob("./**/*", recursive=True):
+        if os.path.isdir(f) and "hashes" in f.split("/")[-1]:
+            shutil.rmtree(f)
+
+
+def parallel_generate_fuzzy_hashes(apks, logs_folder):
+    hashes_resources = defaultdict(defaultdict)  # apk: {res: [fuzzy]}
+    ssdeep_hashes = defaultdict(list)  # apk: [fuzzy]
+
+    for apk in apks:
+        ssdeep_hashes[apk], hashes_resources[apk] = generate_apk_fuzzy_list(apk)
+
+    # Store data
+    print_hashes_file(logs_folder + "/hashes.txt", ssdeep_hashes)
+    print_resources_file(logs_folder + "/res_hashes.txt", hashes_resources)
 
     return ssdeep_hashes
