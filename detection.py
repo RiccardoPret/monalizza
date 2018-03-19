@@ -2,9 +2,9 @@ import ast
 import os
 from collections import defaultdict
 
-THRESHOLD1 = 0.15
-THRESHOLD2 = 0.5
-FRACTION = 10  # If there are more than 1/FRACTION of the total variants, use thr1 for that family for that app
+THRESHOLD1 = 0.3
+THRESHOLD2 = 0.6
+FRACTION = 15  # If there are more than 1/FRACTION of the total variants, use thr1 for that family for that app
 
 
 def get_family(apk):

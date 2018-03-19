@@ -74,7 +74,9 @@ def parallel_detection(db_hashes, apks_list):
     process_folder = data_folder+"/"+str(mp.current_process().pid)
     pathlib.Path(process_folder).mkdir(parents=True, exist_ok=True)
     test_hashes = parallel_generate_fuzzy_hashes(apks_list, process_folder)
+    s = time.time()
     detections = compute_jaccard(db_hashes, test_hashes, process_folder + "/jaccard_scores.txt")
+    print("Jaccard computation: " + str(time.time() - s))
     detection_mlw(detections, process_folder)
 
 
@@ -103,14 +105,14 @@ def first_run(testset, n_proc):
     mlw_stats("classifications.txt")
 
 if __name__ == '__main__':
-    data_folder = "results"
+    data_folder = "risultati"
     n_proc = 2  # parallelism
-    database = "data"  # database path
-    testset = "test"  # test set path
+    database = "/media/pret/Maxtor1/AndroDumpsys/AndroDumpsys_db"  # database path
+    testset = "/media/pret/Maxtor1/AndroDumpsys/AndroDumpsys_test_mlw"  # test set path
 
     pathlib.Path(data_folder).mkdir(parents=True, exist_ok=True)
     start = time.time()
     parallel_initialize_database(database, data_folder, n_proc)
-    print(str(time.time() - start))
+    print("Database generation: " + str(time.time() - start))
     first_run(testset, n_proc)
-    print(str(time.time() - start))
+    print("Total time: " + str(time.time() - start))
