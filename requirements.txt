@@ -1,3 +1,2 @@
 ssdeep==3.2
-matplotlib
 numpy

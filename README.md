@@ -1,7 +1,7 @@
 Extra requirements:
 - Python 3.5+
 - Ssdeep (https://ssdeep-project.github.io/ssdeep/index.html)
-
+- These packages: automake, libtool, python3-dev, g++. If it doesn't work try also with m4, autoconf and perl
 Steps:
 - install ssdeep
 - install requirements.txt
