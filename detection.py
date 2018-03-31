@@ -2,9 +2,11 @@ import ast
 import os
 from collections import defaultdict
 
-THRESHOLD1 = 0.3
-THRESHOLD2 = 0.6
-FRACTION = 15  # If there are more than 1/FRACTION of the total variants, use thr1 for that family for that app
+THRESHOLD1 = 0.27
+THRESHOLD2 = 0.54
+FRACTION = 8  # If there are more than 1/FRACTION of the total variants, use thr1 for that family for that app
+TRUSTED_NUM_REPRESENTATIVES = 8  # If there are less variants, without looking to neighbours, the higher threshold is used
+TOP_NEIGHBOURS = 5  # Top neighbours used to find the proper family for the unknown sample
 
 
 def get_family(apk):
@@ -14,7 +16,7 @@ def get_family(apk):
 def get_custom_fam_threshold(neighbors_fam_freq, db_fams_freq):
     fams_threshold = dict()
     for fam, freq in neighbors_fam_freq.items():
-        if db_fams_freq[fam] >= 10:
+        if db_fams_freq[fam] >= TRUSTED_NUM_REPRESENTATIVES:
             if freq >= db_fams_freq[fam]/FRACTION:
                 fams_threshold[fam] = THRESHOLD1
             else:
@@ -67,7 +69,7 @@ def print_neighbors(apk, neighbors, file_name):
 
 
 def compute_sample_family(apk, neighbors, neighbors_file_name):
-    top_neighbors = sorted(neighbors.items(), key=lambda x: -x[1])[:5]
+    top_neighbors = sorted(neighbors.items(), key=lambda x: -x[1])[:TOP_NEIGHBOURS]
     print_neighbors(apk, [apk for apk, j in top_neighbors], neighbors_file_name)
     fams = dict()
     for n, jaccard in top_neighbors:

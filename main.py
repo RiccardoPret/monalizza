@@ -27,30 +27,14 @@ def read_hashes_file(path):
     return ssdeep_hashes
 
 
-def read_jaccard_scores(file_path):
-    detections = defaultdict(dict)
-
-    lines = open(file_path, "r").read().splitlines()
-
-    for line in lines:
-        apk, apk_neighbors_with_jaccard = ast.literal_eval(line)
-        detections[apk] = apk_neighbors_with_jaccard
-
-    return detections
-
-
 def run_detection(data_folder, test_samples=None):
     pathlib.Path(data_folder).mkdir(parents=True, exist_ok=True)
-    jaccard_file_avail = os.path.exists(data_folder + "/jaccard_scores.txt")
     test_hashes_file_avail = os.path.exists(data_folder + "/hashes.txt")
 
     if test_hashes_file_avail:
-        if jaccard_file_avail:
-            detections = read_jaccard_scores(data_folder+"/jaccard_scores.txt")
-        else:
-            db_hashes = read_hashes_file("hashes_database.txt")
-            test_hashes = read_hashes_file(data_folder + "/hashes.txt")
-            detections = compute_jaccard(db_hashes, test_hashes, data_folder + "/jaccard_scores.txt")
+        db_hashes = read_hashes_file("hashes_database.txt")
+        test_hashes = read_hashes_file(data_folder + "/hashes.txt")
+        detections = compute_jaccard(db_hashes, test_hashes, data_folder + "/jaccard_scores.txt")
     else:
         db_hashes = read_hashes_file("hashes_database.txt")
         start = time.time()
@@ -105,10 +89,10 @@ def first_run(testset, n_proc):
     mlw_stats("classifications.txt")
 
 if __name__ == '__main__':
-    data_folder = "risultati"
+    data_folder = "ris_andrubis_safe"
     n_proc = 2  # parallelism
-    database = "/media/pret/Maxtor1/AndroDumpsys/AndroDumpsys_db"  # database path
-    testset = "/media/pret/Maxtor1/AndroDumpsys/AndroDumpsys_test_mlw"  # test set path
+    database = "/media/pret/Maxtor1/Andrubis/Andrubis_db20"  # database path
+    testset = "/media/pret/Maxtor1/Andrubis/Andrubis_test_safe"  # test set path
 
     pathlib.Path(data_folder).mkdir(parents=True, exist_ok=True)
     start = time.time()
