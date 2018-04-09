@@ -89,10 +89,10 @@ def first_run(testset, n_proc):
     mlw_stats("classifications.txt")
 
 if __name__ == '__main__':
-    data_folder = "ris_andrubis_safe"
+    data_folder = "ris_androdump_safe"
     n_proc = 2  # parallelism
-    database = "/media/pret/Maxtor1/Andrubis/Andrubis_db20"  # database path
-    testset = "/media/pret/Maxtor1/Andrubis/Andrubis_test_safe"  # test set path
+    database = "/media/pret/Maxtor1/AndroDumpsys/AndroDumpsys_db"  # database path
+    testset = "/media/pret/Maxtor1/AndroDumpsys/AndroDumpsys_test_safe"  # test set path
 
     pathlib.Path(data_folder).mkdir(parents=True, exist_ok=True)
     start = time.time()
